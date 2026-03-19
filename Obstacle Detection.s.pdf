@@ -1,0 +1,47 @@
+Multi-Sensor Obstacle Detection
+AREA Lab5, CODE, READONLY
+EXPORT __main
+
+__main PROC
+    ; 1. Enable GPIOA and GPIOC Clocks
+    LDR R0, =0x40023830
+    LDR R1, [R0]
+    ORR R1, R1, #0x05       ; Enable GPIOA (bit 0) and GPIOC (bit 2)
+    STR R1, [R0]
+
+    ; 2. Configure Outputs (PA5, PA6, PA7 for LEDs)
+    LDR R0, =0x40020000     ; GPIOA Base
+    LDR R1, [R0]
+    BIC R1, R1, #0x0000FC00 ; Clear PA5-7
+    ORR R1, R1, #0x00005400 ; Set to Output
+    STR R1, [R0]
+
+    ; 3. Configure Inputs (PC0=Left, PC1=Right, PC2=Rear)
+    LDR R2, =0x40020800     ; GPIOC Base
+    LDR R1, [R2]
+    BIC R1, R1, #0x0000003F ; Set PC0, PC1, PC2 to Input (00)
+    STR R1, [R2]
+
+check_sensors
+    LDR R1, [R2, #0x10]     ; Read GPIOC_IDR
+    MOV R3, #0x00           ; R3 will hold our LED status for GPIOA
+
+    ; Check Left Sensor (PC0)
+    ANDS R4, R1, #0x01
+    BNE check_right         ; If high, no obstacle
+    ORR R3, R3, #0x20       ; If low, obstacle! Prepare PA5
+
+check_right                 ; Check Right Sensor (PC1)
+    ANDS R4, R1, #0x02
+    BNE check_rear
+    ORR R3, R3, #0x40       ; Prepare PA6
+
+check_rear                  ; Check Rear Sensor (PC2)
+    ANDS R4, R1, #0x04
+    BNE update_leds
+    ORR R3, R3, #0x80       ; Prepare PA7
+
+update_leds
+    STR R3, [R0, #0x14]     ; Write all results to GPIOA_ODR at once
+    B check_sensors         ; Loop forever
+    ENDP
